@@ -69,12 +69,12 @@
       '52': {m:{slope:124,course:69.0},f:{slope:134,course:74.3}},
     },
         description:{
-          es:'Pregunta por las reglas locales, el carné por puntos y las tarifas 2026 de Meaztegi Golf.',
-          en:'Ask about the local rules, points based conduct programme and 2026 tariffs at Meaztegi Golf.'
+          es:'Pregunta por Meaztegi Golf o por golf en general. Para reglas generales y el tiempo consultamos fuentes externas.',
+          en:'Ask about Meaztegi Golf or golf in general. We check external sources for general rules and weather.'
         },
         examples:{
-          es:['Calcula mi hándicap de juego','¿Cuántos puntos pierdo si no arreglo un pique?','¿Cuánto cuesta jugar 18 hoyos un día laborable?'],
-          en:['Calculate my playing handicap','How many points for not repairing a pitch mark?','How much is an 18-hole green fee on a weekday?']
+          es:['Calcula mi hándicap de juego','¿Cuántos puntos pierdo si no arreglo un pique?','¿Cómo se dropa una bola?','¿Cuánto cuesta jugar 18 hoyos un día laborable?'],
+          en:['Calculate my playing handicap','How many points for not repairing a pitch mark?','How do I drop a ball?','How much is an 18-hole green fee on a weekday?']
         }
       }
     };
@@ -103,7 +103,7 @@
       placeholder:'Ask about the club…', send:'Send question',
       note:`Beta version · We are testing ${CONFIG.caddieName}.`,
       demo:'The Caddie service is not connected yet.',
-      loading:'Checking the club documents…', error:'I could not check the documents just now. Please try again.'
+      loading:'Checking the relevant sources…', error:'I could not verify the answer just now. Please try again.'
     } : {
       welcome:'¿En qué puedo ayudarte?',
       description:CONFIG.description.es,
@@ -111,7 +111,7 @@
       placeholder:'Pregunta por el club…', send:'Enviar pregunta',
       note:`Versión beta · Estamos probando ${CONFIG.caddieName}.`,
       demo:'El servicio Caddie todavía no está conectado.',
-      loading:'Consultando los documentos del club…', error:'No he podido consultar los documentos ahora. Inténtalo de nuevo.'
+      loading:'Consultando las fuentes pertinentes…', error:'No he podido verificar la respuesta ahora. Inténtalo de nuevo.'
     };
     // Calculadora complementaria al chat de CLUB: los datos solo viven en esta página.
     // Stableford individual fuera de competición: 100 %.
@@ -289,6 +289,30 @@
       log.scrollTop = log.scrollHeight;
       return node;
     }
+    function displayAnswer(node, result) {
+      node.replaceChildren();
+      const chars = Array.from(result.answer);
+      const cited = Array.isArray(result.citations) ? result.citations
+        .filter(c => Number.isInteger(c.start) && Number.isInteger(c.end) &&
+          c.start >= 0 && c.end <= chars.length && c.end > c.start &&
+          typeof c.url === 'string' && c.url.startsWith('https://'))
+        .sort((a,b) => a.start-b.start) : [];
+      let pos = 0;
+      for (const c of cited) {
+        if (c.start < pos) continue;
+        node.append(document.createTextNode(chars.slice(pos,c.start).join('')));
+        const link = document.createElement('a');
+        link.href = c.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = chars.slice(c.start,c.end).join('');
+        if (c.title) link.title = c.title;
+        node.append(link);
+        pos = c.end;
+      }
+      node.append(document.createTextNode(chars.slice(pos).join('')));
+      if (result.source) node.append(document.createTextNode('\n\n↗ ' + result.source));
+    }
     async function submit(value) {
       const question = value.trim();
       if (!question || send.disabled) return;
@@ -307,7 +331,7 @@
         if (!response.ok) throw new Error('Service unavailable');
         const result = await response.json();
         if (typeof result.answer !== 'string') throw new Error('Invalid answer');
-        pending.textContent = result.answer + (result.source ? '\n\n↗ ' + result.source : '');
+        displayAnswer(pending, result);
         if (Object.hasOwn(CONFIG.officialLinks, result.source_url)) {
           const link = document.createElement('a');
           link.href = result.source_url;
