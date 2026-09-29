@@ -158,6 +158,8 @@
       const grouped = groupMode(format);
       const informal = format === 'informal85';
       group.hidden = !grouped;
+      // Hidden inputs still participate in native form validation. Only the
+      // visible player fields may be required for the selected format.
       document.getElementById('calc-index-field').hidden = grouped;
       document.getElementById('calc-tee-field').hidden = grouped || informal;
       document.getElementById('calc-rating-field').hidden = grouped || informal;
@@ -170,6 +172,7 @@
     }
     function renderPlayers() {
       const formal = formatSelect.value !== 'informal85';
+      const grouped = groupMode(formatSelect.value);
       const n = Number(count.value);
       const previous = [...players.querySelectorAll('.calc-player')].map(row => ({
         name:row.querySelector('.player-name').value, index:row.querySelector('.player-index').value,
@@ -193,6 +196,7 @@
           if (formal && previous[i].tee) row.querySelector('.player-tee').value = previous[i].tee;
           if (formal && previous[i].rating) row.querySelector('.player-rating').value = previous[i].rating;
         }
+        row.querySelector('.player-index').required = grouped;
       }
     }
     formatSelect.addEventListener('change', updateFormatFields);
