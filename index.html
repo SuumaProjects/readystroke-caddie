@@ -40,7 +40,7 @@
           <label id="calc-index-field"><span id="calc-index-label"></span><input id="calc-index" type="text" inputmode="decimal" required></label>
           <label id="calc-tee-field"><span id="calc-tee-label"></span><select id="calc-tee"><option>62</option><option>60</option><option>56</option><option>52</option></select></label>
           <label id="calc-rating-field"><span id="calc-rating-label"></span><select id="calc-rating"><option value="m"></option><option value="f"></option></select></label>
-          <label><span id="calc-format-label"></span><select id="calc-format"><option value="informal85"></option><option value="stableford"></option><option value="medal"></option><option value="match"></option><option value="fourball"></option><option value="fourballMatch"></option></select></label>
+          <label><span id="calc-format-label"></span><select id="calc-format"><option value="informal85"></option><optgroup id="other-formats"><option value="stableford"></option><option value="match"></option><option value="fourball"></option><option value="fourballMatch"></option></optgroup></select></label>
         </div>
         <div class="calc-group" id="calc-group" hidden><label class="calc-count" id="calc-count-field"><span id="calc-count-label"></span><select id="calc-count"><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label><div id="calc-players"></div></div>
         <button class="calc-action" id="calc-button" type="submit"></button>
@@ -114,14 +114,14 @@
       loading:'Consultando los documentos del club…', error:'No he podido consultar los documentos ahora. Inténtalo de nuevo.'
     };
     // Calculadora complementaria al chat de CLUB: los datos solo viven en esta página.
-    // Apéndice C del Sistema Mundial de Hándicaps: porcentajes recomendados.
-    // El comité de cada competición puede establecer otro porcentaje.
-    const FORMATS = {informal85:.85, stableford:.95, medal:.95, match:1, fourball:.85, fourballMatch:.90};
+    // Stableford individual fuera de competición: 100 %.
+    // La modalidad informal aplica un acuerdo del grupo, no un porcentaje oficial.
+    const FORMATS = {informal85:.85, stableford:1, match:1, fourball:.85, fourballMatch:.90};
     const calc = document.getElementById('handicap-calculator');
     const labels = en ? {
       title:'Playing handicap · 18 holes', description:'Choose a format and enter each player’s details.',
       index:'Player handicap', tee:'Tee', rating:'Rating', format:'Format', male:'Men', female:'Women', button:'Calculate',
-      formats:{informal85:'Casual Four-Ball · 85% of Index (no Slope)',stableford:'Individual Stableford · 95%',medal:'Individual Medal Play · 95%',match:'Singles Match Play · 100%',fourball:'Four-Ball Medal Play · 85%',fourballMatch:'Four-Ball Match Play · 90%'},
+      formats:{informal85:'Casual Four-Ball · 85% of Index (no Slope)',stableford:'Individual Stableford (non-competition) · 100%',match:'Singles Match Play · 100%',fourball:'Four-Ball Medal Play · 85%',fourballMatch:'Four-Ball Match Play · 90%'},
       invalid:'Enter a valid handicap for each player (for example 20.0).',
       informalQuery:(index)=>`Casual Four-Ball: 85% of Handicap Index ${index}, without Slope`,
       informalResult:(value,index)=>`Agreed strokes for this casual round: ${value} (85% of Handicap Index ${index}, without Slope). This is a group agreement, not an official Playing Handicap.`,
@@ -130,7 +130,7 @@
     } : {
       title:'Hándicap de juego · 18 hoyos', description:'Elige la modalidad e indica los datos de cada jugador.',
       index:'Hcp. del jugador', tee:'Salida', rating:'Valoración', format:'Modalidad', male:'Masculina', female:'Femenina', button:'Calcular',
-      formats:{informal85:'Mejor bola informal · 85 % del hcp., sin Slope',stableford:'Stableford individual · 95 %',medal:'Medal Play individual · 95 %',match:'Match Play individual · 100 %',fourball:'Mejor bola Medal Play · 85 %',fourballMatch:'Mejor bola Match Play · 90 %'},
+      formats:{informal85:'Mejor bola informal · 85 % del hcp., sin Slope',stableford:'Stableford individual fuera de competición · 100 %',match:'Match Play individual · 100 %',fourball:'Mejor bola Medal Play · 85 %',fourballMatch:'Mejor bola Match Play · 90 %'},
       invalid:'Indica un hcp. válido para cada jugador (por ejemplo 20,0).',
       informalQuery:(index)=>`Mejor bola informal: 85% del índice ${index}, sin Slope`,
       informalResult:(value,index)=>`Golpes acordados para esta partida informal: ${value} (85% del índice ${index}, sin Slope). Es un acuerdo del grupo, no el hándicap de juego oficial.`,
@@ -144,6 +144,7 @@
     document.querySelector('#calc-rating [value="f"]').textContent = labels.female;
     for (const [key,label] of Object.entries(labels.formats))
       document.querySelector(`#calc-format [value="${key}"]`).textContent = label;
+    document.getElementById('other-formats').label = en ? 'Other formats' : 'Otras modalidades';
     const singleTee = document.getElementById('calc-tee');
     singleTee.replaceChildren(...Object.keys(RATINGS).map(tee => new Option(tee, tee)));
     singleTee.value = CONFIG.defaultTee;
