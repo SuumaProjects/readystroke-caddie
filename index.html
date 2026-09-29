@@ -210,7 +210,11 @@
         tee:row.querySelector('.player-tee')?.value,
         category:row.querySelector('.player-rating')?.value
       })) : [{name:'',raw:singleIndex.value.trim(),tee:document.getElementById('calc-tee').value,category:document.getElementById('calc-rating').value}];
-      if (entries.some(p => parseIndex(p.raw) === null)) { result.textContent = labels.invalid; return; }
+      if (entries.some(p => parseIndex(p.raw) === null)) {
+        result.textContent = labels.invalid;
+        result.scrollIntoView({block:'end', behavior:'smooth'});
+        return;
+      }
       const data = entries.map(p => {
         const index = parseIndex(p.raw);
         if (format === 'informal85') return {...p,index,strokes:round(index*.85)};
@@ -231,6 +235,7 @@
           (en ? '\nCheck the competition terms for the actual allowance.' : '\nComprueba el porcentaje en las condiciones de la competición.');
       }
       result.textContent = response;
+      result.scrollIntoView({block:'end', behavior:'smooth'});
     });
     document.documentElement.lang = en ? 'en-GB' : 'es';
     document.getElementById('welcome').textContent = copy.welcome;
