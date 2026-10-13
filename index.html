@@ -21,6 +21,8 @@
     .bubble{max-width:min(88%,560px);padding:12px 15px;border-radius:17px;margin:10px 0;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
     .bubble.user{margin-left:auto;color:#fff;background:#164b3f;border-bottom-right-radius:5px}
     .bubble.assistant{background:#fff;border:1px solid #dce7df;border-bottom-left-radius:5px}
+    .answer-sources{margin-top:12px;font-size:12px;white-space:normal;line-height:1.6}
+    .answer-citation{font-size:.85em}
     .bubble.assistant a{color:#145744;text-decoration:underline;text-underline-offset:2px}
     .demo-note{background:#fff;padding:0 16px calc(6px + env(safe-area-inset-bottom));font-size:11px;line-height:1.35;color:#667b70;text-align:center}
     form{display:flex;align-items:end;gap:9px;background:#fff;padding:12px 14px 6px;border-top:1px solid #e1e8e2}
@@ -289,29 +291,100 @@
       log.scrollTop = log.scrollHeight;
       return node;
     }
+    function safeSourceUrl(value) {
+      try {
+        const url = new URL(value);
+        return url.protocol === 'https:' ? url : null;
+      } catch { return null; }
+    }
+    function appendFormattedText(node, value) {
+      const pattern = /\*\*([^*]+)\*\*|\*([^*\n]+)\*/g;
+      let pos = 0;
+      for (const match of value.matchAll(pattern)) {
+        node.append(document.createTextNode(value.slice(pos, match.index)));
+        const emphasis = document.createElement(match[1] !== undefined ? 'strong' : 'em');
+        emphasis.textContent = match[1] !== undefined ? match[1] : match[2];
+        node.append(emphasis);
+        pos = match.index + match[0].length;
+      }
+      node.append(document.createTextNode(value.slice(pos)));
+    }
     function displayAnswer(node, result) {
       node.replaceChildren();
       const chars = Array.from(result.answer);
-      const cited = Array.isArray(result.citations) ? result.citations
-        .filter(c => Number.isInteger(c.start) && Number.isInteger(c.end) &&
-          c.start >= 0 && c.end <= chars.length && c.end > c.start &&
-          typeof c.url === 'string' && c.url.startsWith('https://'))
-        .sort((a,b) => a.start-b.start) : [];
+      const ranges = [];
+      const sources = [];
+      function sourceIndex(value, title) {
+        const url = safeSourceUrl(value);
+        if (!url) return null;
+        const key = url.href;
+        let index = sources.findIndex(source => source.url === key);
+        if (index < 0) {
+          sources.push({url:key, label:url.hostname.replace(/^www\./, ''), title:title || ''});
+          index = sources.length - 1;
+        }
+        return index;
+      }
+      // Parse Markdown links first so annotation offsets cannot leave their URL
+      // or brackets visible. URLs containing parentheses are handled as a whole.
+      for (let start = 0; start < chars.length; start++) {
+        if (chars[start] !== '[') continue;
+        let close = start + 1;
+        while (close < chars.length && chars[close] !== ']' && chars[close] !== '\n') close++;
+        if (chars[close] !== ']' || chars[close + 1] !== '(') continue;
+        let end = close + 2, depth = 1;
+        while (end < chars.length && depth) {
+          if (chars[end] === '(') depth++;
+          if (chars[end] === ')') depth--;
+          end++;
+        }
+        if (depth) continue;
+        const source = sourceIndex(chars.slice(close + 2, end - 1).join(''), chars.slice(start + 1, close).join(''));
+        if (source === null) continue;
+        let from = start, to = end;
+        if (chars[from - 1] === '(' && chars[to] === ')') {from--; to++;}
+        ranges.push({start:from, end:to, source});
+        start = to - 1;
+      }
+      for (const citation of Array.isArray(result.citations) ? result.citations : []) {
+        const {start, end, url, title} = citation;
+        if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end > chars.length || end <= start) continue;
+        if (ranges.some(range => start < range.end && end > range.start)) continue;
+        const source = sourceIndex(url, title);
+        if (source !== null) ranges.push({start, end, source});
+      }
+      ranges.sort((a,b) => a.start - b.start);
       let pos = 0;
-      for (const c of cited) {
-        if (c.start < pos) continue;
-        node.append(document.createTextNode(chars.slice(pos,c.start).join('')));
+      for (const range of ranges) {
+        if (range.start < pos) continue;
+        appendFormattedText(node, chars.slice(pos, range.start).join(''));
         const link = document.createElement('a');
-        link.href = c.url;
+        link.href = sources[range.source].url;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
-        link.textContent = chars.slice(c.start,c.end).join('');
-        if (c.title) link.title = c.title;
+        link.className = 'answer-citation';
+        link.textContent = `[${range.source + 1}]`;
+        link.title = sources[range.source].title || sources[range.source].label;
         node.append(link);
-        pos = c.end;
+        pos = range.end;
       }
-      node.append(document.createTextNode(chars.slice(pos).join('')));
-      if (result.source) node.append(document.createTextNode('\n\n↗ ' + result.source));
+      appendFormattedText(node, chars.slice(pos).join(''));
+      if (result.source) node.append(document.createTextNode('\n\n' + result.source));
+      if (sources.length) {
+        const list = document.createElement('div');
+        list.className = 'answer-sources';
+        sources.forEach((source, index) => {
+          if (index) list.append(document.createTextNode(' · '));
+          const link = document.createElement('a');
+          link.href = source.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = `[${index + 1}] ${source.label}`;
+          link.title = source.title || source.label;
+          list.append(link);
+        });
+        node.append(list);
+      }
     }
     async function submit(value) {
       const question = value.trim();
