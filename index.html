@@ -388,6 +388,11 @@
         node.append(list);
       }
     }
+    // Conversational context exists only in this page's JavaScript memory.
+    // Never use localStorage, sessionStorage, cookies or a remote conversation ID.
+    const conversation = [];
+    const MAX_EXCHANGES = 4;
+    window.addEventListener('pagehide', () => { conversation.length = 0; });
     async function submit(value) {
       const question = value.trim();
       if (!question || send.disabled) return;
@@ -401,12 +406,14 @@
       try {
         const response = await fetch(CONFIG.apiUrl, {
           method: 'POST', headers: {'content-type': 'application/json'},
-          body: JSON.stringify({question, language: navigator.language}),
+          body: JSON.stringify({question, language: navigator.language, history: conversation.map(({question, answer}) => ({question, answer}))}),
         });
         if (!response.ok) throw new Error('Service unavailable');
         const result = await response.json();
         if (typeof result.answer !== 'string') throw new Error('Invalid answer');
         displayAnswer(pending, result);
+        conversation.push({question, answer: result.answer.slice(0, 1500)});
+        if (conversation.length > MAX_EXCHANGES) conversation.shift();
         if (Object.hasOwn(CONFIG.officialLinks, result.source_url)) {
           const link = document.createElement('a');
           link.href = result.source_url;
